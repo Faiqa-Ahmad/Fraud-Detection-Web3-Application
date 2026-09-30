@@ -1,0 +1,4 @@
+"use client";
+import { useEffect, useState } from "react";
+type Status={overall:"operational"|"degraded";healthyNetworks:number;totalNetworks:number;checkedAt:string};
+export default function SystemStatus(){const [status,setStatus]=useState<Status|null>(null);useEffect(()=>{let active=true;const load=()=>fetch("/api/status",{cache:"no-store"}).then(r=>r.json()).then(data=>{if(active)setStatus(data)}).catch(()=>{if(active)setStatus({overall:"degraded",healthyNetworks:0,totalNetworks:5,checkedAt:new Date().toISOString()})});load();const timer=setInterval(load,15000);return()=>{active=false;clearInterval(timer)}},[]);return <div className={`system ${status?.overall==="degraded"?"degraded":""}`}><span className="pulse"/>{status?status.overall==="operational"?"All systems operational":"Service health degraded":"Checking live services…"}<small>{status?`${status.healthyNetworks}/${status.totalNetworks} networks live`:`Contacting blockchain nodes`}</small></div>}

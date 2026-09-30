@@ -1,0 +1,16 @@
+create extension if not exists "pgcrypto";
+create table if not exists wallets (id uuid primary key default gen_random_uuid(), address text not null, chain text not null, risk_score numeric(5,2) default 0, created_at timestamptz default now(), updated_at timestamptz default now(), unique(address,chain));
+create table if not exists transactions (id uuid primary key default gen_random_uuid(), wallet_address text not null, tx_hash text not null, from_address text, to_address text, value text, value_eth numeric, gas bigint, gas_price text, timestamp bigint, block_number bigint, is_contract_interaction boolean default false, token_symbol text, token_value text, chain text not null, created_at timestamptz default now(), unique(tx_hash,wallet_address,chain));
+create table if not exists fraud_scores (id uuid primary key default gen_random_uuid(), wallet text not null, risk_score numeric(5,2) not null check(risk_score between 0 and 100), anomaly_score numeric, risk_level text check(risk_level in ('LOW','MEDIUM','HIGH','CRITICAL')), risk_factors text[] default '{}', confidence numeric(4,3), features jsonb not null default '{}', chain text not null, analyzed_at timestamptz default now());
+create table if not exists watchlist (id uuid primary key default gen_random_uuid(), address text not null, chain text not null, label text, created_at timestamptz default now(), unique(address,chain));
+create table if not exists app_users (id uuid primary key default gen_random_uuid(), wallet_address text not null unique, created_at timestamptz default now(), last_login_at timestamptz default now());
+create table if not exists auth_nonces (id uuid primary key default gen_random_uuid(), wallet_address text not null, nonce_hash text not null unique, message text not null, expires_at timestamptz not null, created_at timestamptz default now());
+create table if not exists user_sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null references app_users(id) on delete cascade, token_hash text not null unique, expires_at timestamptz not null, created_at timestamptz default now());
+alter table watchlist add column if not exists user_id uuid references app_users(id) on delete cascade;
+alter table watchlist drop constraint if exists watchlist_address_chain_key;
+create unique index if not exists idx_watchlist_user_address on watchlist(user_id,address,chain) where user_id is not null;
+create index if not exists idx_sessions_token on user_sessions(token_hash,expires_at);
+create index if not exists idx_nonces_expiry on auth_nonces(expires_at);
+create index if not exists idx_transactions_wallet on transactions(wallet_address,chain,timestamp desc);
+create index if not exists idx_scores_wallet on fraud_scores(wallet,chain,analyzed_at desc);
+alter table wallets enable row level security; alter table transactions enable row level security; alter table fraud_scores enable row level security; alter table watchlist enable row level security; alter table app_users enable row level security; alter table auth_nonces enable row level security; alter table user_sessions enable row level security;

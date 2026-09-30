@@ -1,0 +1,9 @@
+import { NextRequest, NextResponse } from "next/server";
+import { id, zeroPadValue } from "ethers";
+import { fetchTokenAssets, rpc } from "@/lib/blockchain";
+import { CHAINS, ChainId, TokenApproval, isEvmAddress } from "@/lib/types";
+export const runtime="nodejs";
+type Log={topics:string[]};
+export async function GET(request:NextRequest){try{const url=new URL(request.url);const address=url.searchParams.get("address")??"";const chain=(url.searchParams.get("chain")??"") as ChainId;if(!isEvmAddress(address)||!CHAINS[chain])return NextResponse.json({error:"Invalid address or chain"},{status:400});const assets=(await fetchTokenAssets(chain,address)).filter(a=>a.contractAddress).slice(0,15);const latest=parseInt(await rpc<string>(chain,"eth_blockNumber",[]),16);const fromBlock=`0x${Math.max(0,latest-100000).toString(16)}`;const ownerTopic=zeroPadValue(address,32);const approvalTopic=id("Approval(address,address,uint256)");const approvals:TokenApproval[]=[];
+ for(const asset of assets){try{const logs=await rpc<Log[]>(chain,"eth_getLogs",[{address:asset.contractAddress,fromBlock,toBlock:"latest",topics:[approvalTopic,ownerTopic]}]);const spenders=[...new Set(logs.map(log=>log.topics[2]?.slice(-40)).filter(Boolean).map(value=>`0x${value}`))].slice(0,20);for(const spender of spenders){const callData=`0xdd62ed3e${address.slice(2).padStart(64,"0")}${spender.slice(2).padStart(64,"0")}`;const raw=await rpc<string>(chain,"eth_call",[{to:asset.contractAddress,data:callData},"latest"]);const allowance=BigInt(raw||"0x0");if(allowance>0n)approvals.push({tokenAddress:asset.contractAddress!,tokenSymbol:asset.symbol,spender,allowance:allowance.toString(),unlimited:allowance>(1n<<255n)})}}catch{continue}}
+ return NextResponse.json(approvals)}catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Approval scan failed"},{status:502})}}

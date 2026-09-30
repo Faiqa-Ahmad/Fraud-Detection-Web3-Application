@@ -1,0 +1,12 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Sentinel3 — Web3 Security Intelligence",
+  description: "Multi-chain wallet intelligence and AI-powered fraud detection.",
+};
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return <html lang="en"><body>{children}</body></html>;
+}

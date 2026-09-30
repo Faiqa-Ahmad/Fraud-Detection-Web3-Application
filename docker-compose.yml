@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sentinel3
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase-schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel3"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  ai-service:
+    build: ./ai-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      ALCHEMY_API_KEY: ${ALCHEMY_API_KEY:?Set ALCHEMY_API_KEY in .env}
+      ALCHEMY_ETHEREUM_API_KEY: ${ALCHEMY_ETHEREUM_API_KEY:-}
+      ALCHEMY_POLYGON_API_KEY: ${ALCHEMY_POLYGON_API_KEY:-}
+      ALCHEMY_ARBITRUM_API_KEY: ${ALCHEMY_ARBITRUM_API_KEY:-}
+      ALCHEMY_OPTIMISM_API_KEY: ${ALCHEMY_OPTIMISM_API_KEY:-}
+      ALCHEMY_BNB_API_KEY: ${ALCHEMY_BNB_API_KEY:-}
+      DATABASE_URL: postgresql://sentinel:${POSTGRES_PASSWORD}@postgres:5432/sentinel3
+      PYTHON_AI_SERVICE_URL: http://ai-service:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+volumes:
+  postgres_data:
