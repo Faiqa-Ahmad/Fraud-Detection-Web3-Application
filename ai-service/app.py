@@ -13,5 +13,4 @@ demo = gr.Interface(
 # Mount the Gradio UI at the root, but our FastAPI routes like /analyze will still work!
 app = gr.mount_gradio_app(fastapi_app, demo, path="/")
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+
