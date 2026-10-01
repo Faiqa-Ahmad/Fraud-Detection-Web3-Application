@@ -15,8 +15,17 @@ export async function POST(request: NextRequest) {
   const transactions:Transaction[]=raw.map(tx=>({hash:tx.hash,from:tx.from,to:tx.to??"",value:tx.value??0,timestamp:tx.timestamp,status:"confirmed",type:tx.category==="erc721"||tx.category==="erc1155"?"nft":tx.category==="erc20"?"token":tx.category==="external"?"transfer":"contract",gas:0,risk:"safe"}));
   const aiUrl=process.env.PYTHON_AI_SERVICE_URL; if(!aiUrl) throw new Error("PYTHON_AI_SERVICE_URL is not configured");
   const aiTransactions=transactions.slice(0,1000);
-  const aiResponse=await fetch(`${aiUrl}/analyze`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({wallet_address:address,transactions:aiTransactions.map(tx=>({tx_hash:tx.hash,from_address:tx.from,to_address:tx.to,value_eth:tx.value,gas:tx.gas,timestamp:tx.timestamp,is_contract_interaction:tx.type==="contract",token_symbol:tx.type==="token"?"TOKEN":null}))}),signal:AbortSignal.timeout(20000)});
-  if(!aiResponse.ok) throw new Error(`AI service returned ${aiResponse.status}`); const ai=await aiResponse.json(); const balance=Number(formatEther(BigInt(balanceHex)));
+  const txJson = JSON.stringify(aiTransactions.map(tx=>({tx_hash:tx.hash,from_address:tx.from,to_address:tx.to,value_eth:tx.value,gas:tx.gas,timestamp:tx.timestamp,is_contract_interaction:tx.type==="contract",token_symbol:tx.type==="token"?"TOKEN":null})));
+  
+  const { Client } = await import("@gradio/client");
+  const client = await Client.connect(aiUrl);
+  const aiResponse = await client.predict("/predict", [address, txJson]) as any;
+  if (!aiResponse || !aiResponse.data || !aiResponse.data[0]) throw new Error("AI service returned invalid response");
+  
+  const ai = JSON.parse(aiResponse.data[0]);
+  if (ai.error) throw new Error(`AI error: ${ai.error}`);
+  
+  const balance=Number(formatEther(BigInt(balanceHex)));
   const assets=[{symbol:CHAINS[chain].symbol,name:CHAINS[chain].name,balance,valueUsd:nativePrice?balance*nativePrice.usd:null,change24h:nativePrice?.change24h??null,kind:"token" as const},...tokenAssets];const portfolioValue=assets.reduce((sum,a)=>sum+(a.valueUsd??0),0);
   const result:WalletAnalysis={address,chain,balance,portfolioValue,transactionCount:transactions.length,uniqueInteractions:new Set(transactions.flatMap(tx=>[tx.from.toLowerCase(),tx.to.toLowerCase()]).filter(x=>x&&x!==address.toLowerCase())).size,activeDays:transactions.length?Math.max(1,Math.ceil((Date.now()/1000-Math.min(...transactions.map(tx=>tx.timestamp)))/86400)):0,risk:{score:ai.fraud_score.risk_score,level:ai.fraud_score.risk_level,confidence:ai.fraud_score.confidence,factors:ai.fraud_score.risk_factors},assets,transactions,activity:buildActivity(transactions),analyzedAt:new Date().toISOString(),source:"live",contract:{isContract:bytecode!=="0x",bytecodeBytes:Math.max(0,(bytecode.length-2)/2)}};
   if(body.persist!==false)await saveAnalysis(result,ai.features); return NextResponse.json(result,{headers:{"Cache-Control":"no-store"}});
