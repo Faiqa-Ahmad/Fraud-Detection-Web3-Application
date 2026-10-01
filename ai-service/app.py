@@ -1,17 +1,38 @@
-import uvicorn
 import gradio as gr
-from main import app as fastapi_app
+import json
+import time
+from features import extract_features, build_feature_vector
+from model import get_or_train_model, compute_anomaly_score, anomaly_to_risk_score, get_risk_level, compute_confidence
 
-# Create a simple placeholder UI to satisfy Hugging Face's Gradio requirement
+model, scaler = get_or_train_model()
+
+def gradio_analyze(wallet: str, transactions_json: str):
+    try:
+        txs = json.loads(transactions_json)
+        features = extract_features(txs, wallet)
+        vector = build_feature_vector(features)
+        anomaly = compute_anomaly_score(vector, model, scaler)
+        score, factors = anomaly_to_risk_score(anomaly, features)
+        
+        result = {
+            "wallet_address": wallet,
+            "fraud_score": {
+                "risk_score": score,
+                "anomaly_score": round(anomaly, 6),
+                "risk_level": get_risk_level(score),
+                "risk_factors": factors,
+                "confidence": compute_confidence(len(txs))
+            },
+            "features": features,
+            "analyzed_at": time.time()
+        }
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
 demo = gr.Interface(
-    fn=lambda: "Web3 Fraud Detection API is running!", 
-    inputs=None, 
-    outputs="text",
+    fn=gradio_analyze,
+    inputs=[gr.Textbox(label="Wallet"), gr.Textbox(label="Transactions JSON")],
+    outputs=gr.Textbox(label="Result JSON"),
     title="Sentinel3 AI API"
 )
-
-# Mount the Gradio UI at the root, but our FastAPI routes like /analyze will still work!
-app = gr.mount_gradio_app(fastapi_app, demo, path="/")
-
-
-
