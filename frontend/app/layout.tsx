@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Sentinel3 — Web3 Security Intelligence",
-  description: "Multi-chain wallet intelligence and AI-powered fraud detection.",
+  description: "Multi-chain wallet intelligence and advanced fraud detection.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

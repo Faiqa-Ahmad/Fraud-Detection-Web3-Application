@@ -39,7 +39,7 @@ demo = gr.Interface(
     fn=gradio_analyze,
     inputs=[gr.Textbox(label="Wallet"), gr.Textbox(label="Transactions JSON")],
     outputs=gr.Textbox(label="Result JSON"),
-    title="Sentinel3 AI API"
+    title="Sentinel3 Security API"
 )
 
 if __name__ == "__main__":
