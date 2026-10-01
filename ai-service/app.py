@@ -36,3 +36,6 @@ demo = gr.Interface(
     outputs=gr.Textbox(label="Result JSON"),
     title="Sentinel3 AI API"
 )
+
+if __name__ == "__main__":
+    demo.launch()
