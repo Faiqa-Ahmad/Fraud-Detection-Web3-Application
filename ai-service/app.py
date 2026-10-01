@@ -1,10 +1,15 @@
 import gradio as gr
 import json
 import time
+import spaces
 from features import extract_features, build_feature_vector
 from model import get_or_train_model, compute_anomaly_score, anomaly_to_risk_score, get_risk_level, compute_confidence
 
 model, scaler = get_or_train_model()
+
+@spaces.GPU
+def trick_huggingface_parser():
+    return "This exists only to prevent ZeroGPU from crashing."
 
 def gradio_analyze(wallet: str, transactions_json: str):
     try:
