@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   
   const { Client } = await import("@gradio/client");
   const client = await Client.connect(aiUrl);
-  const aiResponse = await client.predict("/predict", [address, txJson]) as any;
+  const aiResponse = await client.predict("/gradio_analyze", [address, txJson]) as any;
   if (!aiResponse || !aiResponse.data || !aiResponse.data[0]) throw new Error("AI service returned invalid response");
   
   const ai = JSON.parse(aiResponse.data[0]);
